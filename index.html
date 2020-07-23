@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src = "https://cdnjs.cloudflare.com/ajax/libs/phaser/3.24.1/phaser.js"></script>
+    <title>First_Game</title>
+    <style>
+        html,body{
+            margin:0px;
+            padding: 0px;
+        }
+    </style>
+</head>
+<body>
+    <script type = "text/javascript">
+        var config = {
+            type: Phaser.AUTO,
+            width: 1365,
+            height: 650,
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 300 },
+                    debug: false
+                }
+            },
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            }
+        };
+
+        var game = new Phaser.Game(config);
+        var score = 0;
+        var platforms,player,scoreText,gameOver;
+        function preload (){
+            this.load.image('sky', 'assets/sky.png');
+            this.load.image('ground', 'assets/platform.png');
+            this.load.image('star', 'assets/star.png');
+            this.load.image('bomb', 'assets/bomb.png');
+            this.load.spritesheet('dude','assets/dude.png',{
+                 frameWidth: 32, frameHeight: 48 
+                 }
+            );
+            this.load.audioSprite('sfx',"assets/fx_mixdown.json",["assets/fx_mixdown.mp3","assets/fx_mixdown.ogg"]);
+        }
+        
+        function create (){
+            // **********BackGround IMAGE***************//
+            this.add.image(400, 300, 'sky').setScale(2.5)
+            // this.add.image(0, 0, 'sky').setOrigin(0, 0)        setOrigin function automatically set the picture 
+            //******MAKING A STAIIC GROUP (so that gravity dosen't effect our platform) *****//
+            platforms = this.physics.add.staticGroup();
+            platforms.create(400, 635, 'ground').setScale(4.85).refreshBody();
+            platforms.create(1200, 400, 'ground');
+            platforms.create(1250, 100, 'ground');
+            platforms.create(400, 400, 'ground');
+            platforms.create(50, 250, 'ground');
+            platforms.create(750, 220, 'ground');
+            //****** this is our player sprite Sheets which is used to show him when he move *** //
+            player = this.physics.add.sprite(100, 450, 'dude');
+            player.setBounce(0.2);
+            player.setCollideWorldBounds(true);        // used so that our playe can't go outside the scene
+            // player.body.setGravityY(300)player.setCollideWorldBounds(true);
+            this.physics.add.collider(player,platforms);
+            //****** adding stars********//
+            stars = this.physics.add.group({
+                key: 'star',
+                repeat: 13,
+                setXY: { x: 20, y: 0, stepX: 100 }
+            });
+
+            stars.children.iterate(function (child) {
+                child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
+            });
+
+            this.physics.add.collider(stars, platforms);
+            this.physics.add.overlap(player, stars, collectStar, null, this);
+
+            function collectStar (player, star)
+            {
+                star.disableBody(true, true);
+                this.sound.playAudioSprite("sfx","ping");
+                score += 10;                                // store the score 
+                scoreText.setText('Score: ' + score);       // display the score on screen
+
+                if (stars.countActive(true) === 0)          // count remaining stars and if stars == 0 then
+                {
+                    stars.children.iterate(function (child) {               // this function again add the stars and set the postion
+                        child.enableBody(true, child.x, 0, true, true);
+
+                    });
+
+                    var x = (player.x < 400) ? Phaser.Math.Between(400, 800) : Phaser.Math.Between(0, 400);     // this line drop the bomb always opp.side of player
+
+                    var bomb = bombs.create(x, 16, 'bomb');             // this will create a bomb
+                    bomb.setBounce(1);                                      
+                    bomb.setCollideWorldBounds(true);
+                    bomb.setVelocity(Phaser.Math.Between(-200, 200), 20);       // set random vlocity
+
+                }
+            }
+
+            //****** PLAYER SCORE **********//
+            scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#000' });
+            
+
+            //********* Adding Bombs ********///
+            bombs = this.physics.add.group();
+            this.physics.add.collider(bombs, platforms);
+            this.physics.add.collider(player, bombs, hitBomb, null, this);
+
+            function hitBomb (player, bomb)
+            {
+                this.sound.playAudioSprite("sfx","shot");
+                this.physics.pause();
+                player.setTint(0xff0000);
+                player.anims.play('turn');
+                gameOver = true;
+                gameOver = this.add.text(480, 300, 'GAME - OVER', { fontSize: '75px', fill: 'yellow' }) ;
+                location.reload();
+            }
+            //***********for controlling player***********//
+            cursors = this.input.keyboard.createCursorKeys();
+
+            // ***************ANIMATION******************//
+            this.anims.create({
+                key: 'left',
+                frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }),
+                frameRate: 10,
+                repeat: -1
+            });
+
+            this.anims.create({
+                key: 'turn',
+                frames: [ { key: 'dude', frame: 4 } ],
+                frameRate: 20
+            });
+
+            this.anims.create({
+                key: 'right',
+                frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }),
+                frameRate: 10,
+                repeat: -1
+            });
+        }
+
+        function update (){
+            if (cursors.left.isDown)
+            {
+                player.setVelocityX(-160);
+                player.anims.play('left', true);
+                // this.sound.playAudioSprite("sfx","squit");
+            }
+            else if (cursors.right.isDown)
+            {
+                player.setVelocityX(160);
+                player.anims.play('right', true);
+                // this.sound.playAudioSprite("sfx","squit");
+            }
+            else
+            {
+                player.setVelocityX(0);
+                player.anims.play('turn');               
+            }
+
+            if (cursors.up.isDown && player.body.touching.down)
+            {
+                player.setVelocityY(-328);
+            }
+        }
+    </script>
+</body>
+</html>
